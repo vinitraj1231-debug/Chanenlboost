@@ -1,0 +1,22 @@
+# ChannelBoost Exchange Bot - Dependencies
+# Install: pip install -r requirements.txt
+
+# Core
+aiogram==3.13.1
+aiohttp==3.10.10
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+
+# Redis (FSM storage + caching)
+redis==5.2.0
+
+# Scheduler
+apscheduler==3.10.4
+
+# Config
+python-dotenv==1.0.1
+
+# Utilities
+pytz==2024.2

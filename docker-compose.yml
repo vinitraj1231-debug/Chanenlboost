@@ -1,0 +1,109 @@
+version: "3.9"
+
+# ╔══════════════════════════════════════════════════════╗
+# ║     ChannelBoost Bot - Docker Compose               ║
+# ║     Run: docker-compose up -d                       ║
+# ╚══════════════════════════════════════════════════════╝
+
+services:
+
+  # ── PostgreSQL Database ────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: channelboost_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: channelboost_db
+      POSTGRES_USER: channelboost
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-strongpassword123}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - channelboost_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U channelboost -d channelboost_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis ──────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: channelboost_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redispass123}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - channelboost_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispass123}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── ChannelBoost Bot ───────────────────────────────────
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: channelboost_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://channelboost:${POSTGRES_PASSWORD:-strongpassword123}@postgres:5432/channelboost_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass123}@redis:6379/0
+    volumes:
+      - bot_logs:/app/logs
+    networks:
+      - channelboost_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${WEBAPP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import asyncio; asyncio.run(__import__('asyncio').sleep(0))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── PgAdmin (optional - remove in production) ─────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: channelboost_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@channelboost.com
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-adminpassword}
+    ports:
+      - "5050:80"
+    networks:
+      - channelboost_net
+    depends_on:
+      - postgres
+    profiles:
+      - debug  # Only starts with: docker-compose --profile debug up
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  bot_logs:
+    driver: local
+
+networks:
+  channelboost_net:
+    driver: bridge
+    name: channelboost_network

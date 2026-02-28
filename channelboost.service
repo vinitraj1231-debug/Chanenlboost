@@ -1,0 +1,50 @@
+# ╔══════════════════════════════════════════════════════╗
+# ║   ChannelBoost Bot - Systemd Service                ║
+# ║                                                      ║
+# ║   Installation:                                      ║
+# ║   sudo cp channelboost.service /etc/systemd/system/ ║
+# ║   sudo systemctl daemon-reload                       ║
+# ║   sudo systemctl enable channelboost                 ║
+# ║   sudo systemctl start channelboost                  ║
+# ╚══════════════════════════════════════════════════════╝
+
+[Unit]
+Description=ChannelBoost Cross Promotion Exchange Bot
+Documentation=https://github.com/yourrepo/channelboost
+After=network.target postgresql.service redis.service
+Wants=network.target
+Requires=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=botuser
+Group=botuser
+WorkingDirectory=/opt/channelboost
+ExecStart=/opt/channelboost/venv/bin/python channelboost_bot.py
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Auto restart
+Restart=on-failure
+RestartSec=10s
+RestartPreventExitStatus=2
+StartLimitInterval=200
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=channelboost
+
+# Environment
+EnvironmentFile=/opt/channelboost/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/opt/channelboost
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/channelboost/logs
+
+[Install]
+WantedBy=multi-user.target
